@@ -12,6 +12,16 @@ export async function acquireFocus(policy: string, input: boolean): Promise<Focu
     throw new CliCommandError('invalid_foreground_policy', 'foreground must be auto, never or required');
   if (!input && policy !== 'required')
     return { receipt: { activated: false, inspection: true }, release: async () => ({ restored: false }) };
+  // Windows builds never activate Studio. Input is still delivered through the
+  // engine, and scenario `expect` conditions prove its effect.
+  if (process.platform === 'win32') {
+    if (policy === 'required')
+      throw new CliCommandError('foreground_unavailable', 'Windows builds do not activate Studio. Bring the Studio play window to the front and use --foreground auto or never.');
+    return {
+      receipt: { activated: false, foreground: 'unmanaged', reason: 'Windows builds do not activate Studio; keep the Studio play window in front while input runs.' },
+      release: async () => ({ restored: false }),
+    };
+  }
   const helper = join(packageRoot(), 'dist/native/focus-session');
   if (process.platform !== 'darwin' || !existsSync(helper))
     throw new CliCommandError('foreground_unavailable', 'Build the native focus helper before running interactive scenarios.');
